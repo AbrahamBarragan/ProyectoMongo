@@ -3,6 +3,7 @@
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Data.SqlClient;
+using System.Globalization;
 
 namespace ProyectoMongo
 {
@@ -228,7 +229,7 @@ namespace ProyectoMongo
 
         private void InsertarDatosEnSqlServer(List<Dato> datos)
         {
-            var connectionString = "Server=localhost;Database=MongoToSql;Trusted_Connection=True;";
+            var connectionString = "Server=localhost\\SQLEXPRESS;Database=MongoToSql;Trusted_Connection=True;";
 
             using (var connection = new SqlConnection(connectionString))
             {
@@ -237,41 +238,65 @@ namespace ProyectoMongo
                 foreach (var dato in datos)
                 {
                     int personaId;
-                    var personaQuery = "INSERT INTO Personas (FirstName, LastName, Email, Phone, Gender) " +
-                                       "VALUES (@FirstName, @LastName, @Email, @Phone, @Gender) " +
-                                       "SELECT CAST(scope_identity() AS int);";
+
+                    string personaQuery = @"
+            IF NOT EXISTS (SELECT 1 FROM Personas WHERE Email = @Email)
+            BEGIN
+                INSERT INTO Personas (FirstName, LastName, Email, Phone, Gender)
+                VALUES (@FirstName, @LastName, @Email, @Phone, @Gender);
+                SELECT CAST(scope_identity() AS int);
+            END
+            ELSE
+            BEGIN
+                SELECT PersonaId FROM Personas WHERE Email = @Email;  -- Cambia 'Id' por 'PersonaId'
+            END";
 
                     using (var personaCommand = new SqlCommand(personaQuery, connection))
                     {
                         personaCommand.Parameters.AddWithValue("@FirstName", dato.FirstName);
-                        personaCommand.Parameters.AddWithValue("@LastName", dato.FirstName);
-                        personaCommand.Parameters.AddWithValue("@Email", dato.FirstName);
-                        personaCommand.Parameters.AddWithValue("@Phone", dato.FirstName);
-                        personaCommand.Parameters.AddWithValue("@Gender", dato.FirstName);
+                        personaCommand.Parameters.AddWithValue("@LastName", dato.LastName);
+                        personaCommand.Parameters.AddWithValue("@Email", dato.Email);
+                        personaCommand.Parameters.AddWithValue("@Phone", dato.Phone);
+
+                        var genderValue = dato.Gender.Length > 10 ? dato.Gender.Substring(0, 10) : dato.Gender;
+                        personaCommand.Parameters.AddWithValue("@Gender", genderValue);
 
                         personaId = (int)personaCommand.ExecuteScalar();
                     }
 
                     int peliculaId;
-                    var peliculaQuery = "INSERT INTO Peliculas (MovieTitle, MovieGenres) " +
-                                        "VALUES (@MovieTitle, @MovieGeners); " +
-                                        "SELECT CAST(scope_identity() AS int);";
 
-                    using (var  peliculaCommand = new SqlCommand(peliculaQuery, connection))
+                    var peliculaQuery = @"
+            IF NOT EXISTS (SELECT 1 FROM Peliculas WHERE MovieTitle = @MovieTitle)
+            BEGIN
+                INSERT INTO Peliculas (MovieTitle, MovieGenres)
+                VALUES (@MovieTitle, @MovieGenres);
+                SELECT CAST(scope_identity() AS int);
+            END
+            ELSE
+            BEGIN
+                SELECT PeliculaId FROM Peliculas WHERE MovieTitle = @MovieTitle;  -- Cambia 'Id' por 'PeliculaId'
+            END";
+
+                    using (var peliculaCommand = new SqlCommand(peliculaQuery, connection))
                     {
                         peliculaCommand.Parameters.AddWithValue("@MovieTitle", dato.MovieTitle);
-                        peliculaCommand.Parameters.AddWithValue("@MovieGeners", dato.MovieTitle);
+                        peliculaCommand.Parameters.AddWithValue("@MovieGenres", dato.MovieGenres);
 
                         peliculaId = (int)peliculaCommand.ExecuteScalar();
                     }
 
-                    var funcionQuery = "INSERT INTO Funciones (Fecha, Hora, Precio, Asiento, SalaDeCine, PersonaId, PeliculaId) " +
-                                       "VALUES (@Fecha, @Hora, @Precio, @Asiento, @SalaDeCine, @PersonaId, @PeliculaId)";
+                    var funcionQuery = @"
+            INSERT INTO Funciones (Fecha, Hora, Precio, Asiento, SalaDeCine, PersonaId, PeliculaId)
+            VALUES (@Fecha, @Hora, @Precio, @Asiento, @SalaDeCine, @PersonaId, @PeliculaId)";
 
                     using (var funcionCommand = new SqlCommand(funcionQuery, connection))
                     {
-                        funcionCommand.Parameters.AddWithValue("@Fecha", dato.Date.ToString("yyyy-MM-dd"));
-                        funcionCommand.Parameters.AddWithValue("@Hora", dato.Time.ToString());
+                        var formattedDate = dato.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                        var formattedTime = dato.Time.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+
+                        funcionCommand.Parameters.AddWithValue("@Fecha", formattedDate);
+                        funcionCommand.Parameters.AddWithValue("@Hora", formattedTime);
                         funcionCommand.Parameters.AddWithValue("@Precio", dato.Price);
                         funcionCommand.Parameters.AddWithValue("@Asiento", dato.Seat);
                         funcionCommand.Parameters.AddWithValue("@SalaDeCine", dato.CinemaRoom);
