@@ -1,18 +1,21 @@
 ﻿using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson;
+using MongoDB.Driver;
 
 namespace ProyectoMongo
 {
     public class Dato
     {
+        private readonly IMongoCollection<Dato> _datos;
+
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; }
 
-        [BsonElement("firstname")]
+        [BsonElement("first_name")]
         public string FirstName { get; set; }
 
-        [BsonElement("lastname")]
+        [BsonElement("last_name")]
         public string LastName { get; set; }
 
         [BsonElement("email")]
@@ -24,10 +27,10 @@ namespace ProyectoMongo
         [BsonElement("gender")]
         public string Gender { get; set; }
 
-        [BsonElement("moviegenres")]
+        [BsonElement("movie_genres")]
         public string MovieGenres { get; set; }
 
-        [BsonElement("movietitle")]
+        [BsonElement("movie_title")]
         public string MovieTitle { get; set; }
 
         [BsonElement("date")]
@@ -42,7 +45,29 @@ namespace ProyectoMongo
         [BsonElement("seat")]
         public int Seat { get; set; }
 
-        [BsonElement("cinemaroom")]
+        [BsonElement("cinema_room")]
         public int CinemaRoom { get; set; }
+
+        public Dato()
+        {
+            string connectionString = "mongodb://localhost:27017";
+
+            MongoClient client = new MongoClient(connectionString);
+            IMongoDatabase database = client.GetDatabase("MongoToSql");
+            _datos = database.GetCollection<Dato>("datos");
+        }
+
+        public void Agregar(List<Dato> datos)
+        {
+            try
+            {
+                _datos.InsertMany(datos);
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
+        }
     }
 }
