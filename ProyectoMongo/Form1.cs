@@ -1,5 +1,9 @@
 
 
+using MongoDB.Bson;
+using MongoDB.Driver;
+using System.Data.SqlClient;
+
 namespace ProyectoMongo
 {
     public partial class Form1 : Form
@@ -198,5 +202,86 @@ namespace ProyectoMongo
             }
         }
 
+        private void button4_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var datos = ObtenerDatosDeMongoDB();
+
+                InsertarDatosEnSqlServer(datos);
+
+                MessageBox.Show("Datos transferidos exitosamente.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private List<Dato> ObtenerDatosDeMongoDB()
+        {
+            var client = new MongoClient("mongodb://localhost:27017");
+            var database = client.GetDatabase("MongoToSql");
+            var collection = database.GetCollection<Dato>("datos");
+            return collection.Find(new BsonDocument()).ToList();
+        }
+
+        private void InsertarDatosEnSqlServer(List<Dato> datos)
+        {
+            var connectionString = "Server=localhost;Database=MongoToSql;Trusted_Connection=True;";
+
+            using (var connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+
+                foreach (var dato in datos)
+                {
+                    int personaId;
+                    var personaQuery = "INSERT INTO Personas (FirstName, LastName, Email, Phone, Gender) " +
+                                       "VALUES (@FirstName, @LastName, @Email, @Phone, @Gender) " +
+                                       "SELECT CAST(scope_identity() AS int);";
+
+                    using (var personaCommand = new SqlCommand(personaQuery, connection))
+                    {
+                        personaCommand.Parameters.AddWithValue("@FirstName", dato.FirstName);
+                        personaCommand.Parameters.AddWithValue("@LastName", dato.FirstName);
+                        personaCommand.Parameters.AddWithValue("@Email", dato.FirstName);
+                        personaCommand.Parameters.AddWithValue("@Phone", dato.FirstName);
+                        personaCommand.Parameters.AddWithValue("@Gender", dato.FirstName);
+
+                        personaId = (int)personaCommand.ExecuteScalar();
+                    }
+
+                    int peliculaId;
+                    var peliculaQuery = "INSERT INTO Peliculas (MovieTitle, MovieGenres) " +
+                                        "VALUES (@MovieTitle, @MovieGeners); " +
+                                        "SELECT CAST(scope_identity() AS int);";
+
+                    using (var  peliculaCommand = new SqlCommand(peliculaQuery, connection))
+                    {
+                        peliculaCommand.Parameters.AddWithValue("@MovieTitle", dato.MovieTitle);
+                        peliculaCommand.Parameters.AddWithValue("@MovieGeners", dato.MovieTitle);
+
+                        peliculaId = (int)peliculaCommand.ExecuteScalar();
+                    }
+
+                    var funcionQuery = "INSERT INTO Funciones (Fecha, Hora, Precio, Asiento, SalaDeCine, PersonaId, PeliculaId) " +
+                                       "VALUES (@Fecha, @Hora, @Precio, @Asiento, @SalaDeCine, @PersonaId, @PeliculaId)";
+
+                    using (var funcionCommand = new SqlCommand(funcionQuery, connection))
+                    {
+                        funcionCommand.Parameters.AddWithValue("@Fecha", dato.Date.ToString("yyyy-MM-dd"));
+                        funcionCommand.Parameters.AddWithValue("@Hora", dato.Time.ToString());
+                        funcionCommand.Parameters.AddWithValue("@Precio", dato.Price);
+                        funcionCommand.Parameters.AddWithValue("@Asiento", dato.Seat);
+                        funcionCommand.Parameters.AddWithValue("@SalaDeCine", dato.CinemaRoom);
+                        funcionCommand.Parameters.AddWithValue("@PersonaId", personaId);
+                        funcionCommand.Parameters.AddWithValue("@PeliculaId", peliculaId);
+
+                        funcionCommand.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
     }
 }
